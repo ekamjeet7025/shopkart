@@ -1,0 +1,72 @@
+{
+  "info": {
+    "name": "ShopKart Lab 05 - Shopping Cart",
+    "description": "Register a disposable customer first, set email and password, then run this collection in order. It chooses an in-stock product with at least two units unless productId is supplied.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "email", "value": "" },
+    { "key": "password", "value": "" },
+    { "key": "productId", "value": "" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Login",
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"email\":\"{{email}}\",\"password\":\"{{password}}\"}" }, "url": "{{baseUrl}}/customers/login" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Login succeeds', () => pm.response.to.have.status(200));", "const cookie = pm.response.headers.get('Set-Cookie') || '';", "const match = cookie.match(/token=([^;]+)/);", "if (match) pm.collectionVariables.set('token', match[1]);", "pm.test('JWT cookie returned', () => pm.expect(match).to.exist);"] } }]
+    },
+    {
+      "name": "Choose product",
+      "request": { "method": "GET", "url": "{{baseUrl}}/products" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Catalog loads', () => pm.response.to.have.status(200));", "const catalog = pm.response.json();", "const suitableProduct = catalog.products.find((product) => product.stock >= 2);", "if (!pm.collectionVariables.get('productId') && suitableProduct) pm.collectionVariables.set('productId', suitableProduct._id);", "pm.test('Product ID available', () => pm.expect(pm.collectionVariables.get('productId')).to.be.ok);"] } }]
+    },
+    {
+      "name": "Guest cannot get cart",
+      "request": { "method": "GET", "url": "{{baseUrl}}/cart" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Guest gets 401', () => pm.response.to.have.status(401));"] } }]
+    },
+    {
+      "name": "Get empty cart",
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/cart" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Cart loads', () => pm.response.to.have.status(200));", "pm.test('Cart starts empty', () => pm.expect(pm.response.json().cart).to.be.an('array').that.is.empty);"] } }]
+    },
+    {
+      "name": "Add product",
+      "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/cart/{{productId}}" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Add succeeds', () => pm.response.to.have.status(200));", "pm.test('Quantity is 1', () => pm.expect(pm.response.json().cart[0].quantity).to.eql(1));"] } }]
+    },
+    {
+      "name": "Add same product again",
+      "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/cart/{{productId}}" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Second add succeeds', () => pm.response.to.have.status(200));", "pm.test('One row, quantity 2', () => { const rows = pm.response.json().cart; pm.expect(rows).to.have.length(1); pm.expect(rows[0].quantity).to.eql(2); });"] } }]
+    },
+    {
+      "name": "Get populated cart",
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/cart" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Cart loads', () => pm.response.to.have.status(200));", "pm.test('Product is populated', () => { const product = pm.response.json().cart[0].product; pm.expect(product.name).to.be.a('string'); pm.expect(product.price).to.be.a('number'); pm.expect(product.stock).to.be.a('number'); });"] } }]
+    },
+    {
+      "name": "Set quantity to 1",
+      "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"quantity\":1}" }, "url": "{{baseUrl}}/cart/{{productId}}" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Update succeeds', () => pm.response.to.have.status(200));", "pm.test('Quantity is 1', () => pm.expect(pm.response.json().cart[0].quantity).to.eql(1));"] } }]
+    },
+    {
+      "name": "Reject quantity below 1",
+      "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"quantity\":0}" }, "url": "{{baseUrl}}/cart/{{productId}}" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Invalid quantity gets 400', () => pm.response.to.have.status(400));"] } }]
+    },
+    {
+      "name": "Reject quantity above stock",
+      "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"quantity\":999999}" }, "url": "{{baseUrl}}/cart/{{productId}}" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Stock limit gets 400', () => pm.response.to.have.status(400));"] } }]
+    },
+    {
+      "name": "Remove product",
+      "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/cart/{{productId}}" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Remove succeeds', () => pm.response.to.have.status(200));", "pm.test('Cart is empty', () => pm.expect(pm.response.json().cart).to.be.empty);"] } }]
+    }
+  ],
+  "protocolProfileBehavior": { "disableCookies": true }
+}

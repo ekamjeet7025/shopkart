@@ -1,0 +1,115 @@
+{
+  "info": {
+    "name": "ShopKart — Lab 04 Wishlist",
+    "description": "Run against the backend with two disposable registered customer accounts. Set email/password and otherEmail/otherPassword in collection variables. Leave productId empty to use the first catalog product. Requests disable the cookie jar and use the JWT returned in the login cookie as a Bearer token. The suite adds/removes the chosen product from account A.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "email", "value": "" },
+    { "key": "password", "value": "" },
+    { "key": "otherEmail", "value": "" },
+    { "key": "otherPassword", "value": "" },
+    { "key": "productId", "value": "" },
+    { "key": "tokenA", "value": "" },
+    { "key": "tokenB", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 — Login customer A",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "POST", "url": "{{baseUrl}}/customers/login", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"email\":\"{{email}}\",\"password\":\"{{password}}\"}" } },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Login succeeds', () => pm.response.to.have.status(200));", "const cookie = pm.response.headers.get('Set-Cookie') || '';", "const match = cookie.match(/token=([^;]+)/);", "pm.test('JWT cookie exists', () => pm.expect(match).to.not.equal(null));", "if (match) pm.collectionVariables.set('tokenA', match[1]);"] } }]
+    },
+    {
+      "name": "02 — Login customer B",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "POST", "url": "{{baseUrl}}/customers/login", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"email\":\"{{otherEmail}}\",\"password\":\"{{otherPassword}}\"}" } },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Login succeeds', () => pm.response.to.have.status(200));", "const cookie = pm.response.headers.get('Set-Cookie') || '';", "const match = cookie.match(/token=([^;]+)/);", "pm.test('JWT cookie exists', () => pm.expect(match).to.not.equal(null));", "if (match) pm.collectionVariables.set('tokenB', match[1]);"] } }]
+    },
+    {
+      "name": "03 — Choose catalog product",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "GET", "url": "{{baseUrl}}/products" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Catalog loads', () => pm.response.to.have.status(200));", "const products = pm.response.json().products;", "if (!pm.collectionVariables.get('productId') && products.length) pm.collectionVariables.set('productId', products[0]._id);", "pm.test('Product selected', () => pm.expect(pm.collectionVariables.get('productId')).to.match(/^[a-f0-9]{24}$/i));"] } }]
+    },
+    {
+      "name": "04 — Unauthenticated GET rejected",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "GET", "url": "{{baseUrl}}/wishlist" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] } }]
+    },
+    {
+      "name": "05 — Unauthenticated POST rejected",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "POST", "url": "{{baseUrl}}/wishlist/{{productId}}" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] } }]
+    },
+    {
+      "name": "06 — Unauthenticated DELETE rejected",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "DELETE", "url": "{{baseUrl}}/wishlist/{{productId}}" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"] } }]
+    },
+    {
+      "name": "07 — Clear test item before save",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "DELETE", "url": "{{baseUrl}}/wishlist/{{productId}}", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }] },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Removed or already absent', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));"] } }]
+    },
+    {
+      "name": "08 — Add product",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "POST", "url": "{{baseUrl}}/wishlist/{{productId}}", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }] },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('201 Created', () => pm.response.to.have.status(201));", "pm.test('Success message', () => pm.expect(pm.response.json().success).to.equal(true));"] } }]
+    },
+    {
+      "name": "09 — Duplicate rejected",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "POST", "url": "{{baseUrl}}/wishlist/{{productId}}", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }] },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('409 Conflict', () => pm.response.to.have.status(409));"] } }]
+    },
+    {
+      "name": "10 — Populated wishlist",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "GET", "url": "{{baseUrl}}/wishlist", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }] },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));", "const wishlistResponse = pm.response.json();", "pm.test('Count matches products', () => pm.expect(wishlistResponse.count).to.equal(wishlistResponse.wishlist.length));", "const matches = wishlistResponse.wishlist.filter(p => p._id === pm.collectionVariables.get('productId'));", "pm.test('Saved exactly once', () => pm.expect(matches.length).to.equal(1));", "pm.test('Product fields populated', () => pm.expect(matches[0]).to.include.all.keys('_id', 'name', 'price', 'category', 'image', 'stock'));"] } }]
+    },
+    {
+      "name": "11 — Customer B cannot see A’s item",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "GET", "url": "{{baseUrl}}/wishlist", "header": [{ "key": "Authorization", "value": "Bearer {{tokenB}}" }] },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));", "pm.test('Other customer has no saved test item', () => pm.expect(pm.response.json().wishlist.some(p => p._id === pm.collectionVariables.get('productId'))).to.equal(false));"] } }]
+    },
+    {
+      "name": "12 — Invalid product ID",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "POST", "url": "{{baseUrl}}/wishlist/not-an-id", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }] },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('400 Bad Request', () => pm.response.to.have.status(400));"] } }]
+    },
+    {
+      "name": "13 — Missing product",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "POST", "url": "{{baseUrl}}/wishlist/000000000000000000000000", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }] },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] } }]
+    },
+    {
+      "name": "14 — Remove product",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "DELETE", "url": "{{baseUrl}}/wishlist/{{productId}}", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }] },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }]
+    },
+    {
+      "name": "15 — Repeated removal rejected",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "DELETE", "url": "{{baseUrl}}/wishlist/{{productId}}", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }] },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] } }]
+    },
+    {
+      "name": "16 — Removal persisted",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "request": { "method": "GET", "url": "{{baseUrl}}/wishlist", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }] },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));", "pm.test('Test item no longer saved', () => pm.expect(pm.response.json().wishlist.some(p => p._id === pm.collectionVariables.get('productId'))).to.equal(false));"] } }]
+    }
+  ]
+}

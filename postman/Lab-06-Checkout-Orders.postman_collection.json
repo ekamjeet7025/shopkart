@@ -1,0 +1,70 @@
+{
+  "info": {
+    "name": "ShopKart Lab 06 - Checkout and Orders",
+    "description": "Run in order with a disposable account, its email/password, and Razorpay Test Mode keys configured on the backend. This checks the API up to an unpaid order and rejects a fake signature. Complete a valid payment in the browser; the backend integration test exercises valid signature verification without real money.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "email", "value": "" },
+    { "key": "password", "value": "" },
+    { "key": "token", "value": "" },
+    { "key": "productId", "value": "" },
+    { "key": "shopKartOrderId", "value": "" },
+    { "key": "razorpayOrderId", "value": "" },
+    { "key": "expectedPrice", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Guest cannot list orders",
+      "request": { "method": "GET", "url": "{{baseUrl}}/orders" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Guest gets 401', () => pm.response.to.have.status(401));"] } }]
+    },
+    {
+      "name": "Login",
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"email\":\"{{email}}\",\"password\":\"{{password}}\"}" }, "url": "{{baseUrl}}/customers/login" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Login succeeds', () => pm.response.to.have.status(200));", "const cookie = pm.response.headers.get('Set-Cookie') || '';", "const match = cookie.match(/token=([^;]+)/);", "if (match) pm.collectionVariables.set('token', match[1]);", "pm.test('JWT cookie returned', () => pm.expect(match).to.exist);"] } }]
+    },
+    {
+      "name": "Choose an in-stock product",
+      "request": { "method": "GET", "url": "{{baseUrl}}/products" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Catalog loads', () => pm.response.to.have.status(200));", "const product = pm.response.json().products.find(item => item.stock >= 1 && item.price >= 1);", "pm.test('Product available', () => pm.expect(product).to.exist);", "if (product) { pm.collectionVariables.set('productId', product._id); pm.collectionVariables.set('expectedPrice', String(product.price)); }"] } }]
+    },
+    {
+      "name": "Add product to cart",
+      "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/cart/{{productId}}" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Cart add succeeds', () => pm.response.to.have.status(200));"] } }]
+    },
+    {
+      "name": "Reject invalid shipping address",
+      "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"shippingAddress\":{\"fullName\":\"Lab 6 Test\",\"phone\":\"9999999999\",\"addressLine1\":\"22 MG Road\",\"city\":\"Bengaluru\",\"state\":\"Karnataka\",\"pincode\":\"123\"}}" }, "url": "{{baseUrl}}/orders/create-payment-order" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Invalid pincode gets 400', () => pm.response.to.have.status(400));"] } }]
+    },
+    {
+      "name": "Create pending payment order",
+      "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"shippingAddress\":{\"fullName\":\"Lab 6 Test\",\"phone\":\"9999999999\",\"addressLine1\":\"22 MG Road\",\"city\":\"Bengaluru\",\"state\":\"Karnataka\",\"pincode\":\"560001\"},\"totalAmount\":1}" }, "url": "{{baseUrl}}/orders/create-payment-order" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Pending order created', () => pm.response.to.have.status(201));", "const body = pm.response.json();", "pm.test('Server calculates amount, ignores supplied total', () => pm.expect(body.amount).to.eql(Math.round(Number(pm.collectionVariables.get('expectedPrice')) * 100)));", "pm.test('Test key and Razorpay order returned', () => { pm.expect(body.key).to.match(/^rzp_test_/); pm.expect(body.razorpayOrderId).to.be.a('string'); });", "pm.collectionVariables.set('shopKartOrderId', body.shopKartOrderId);", "pm.collectionVariables.set('razorpayOrderId', body.razorpayOrderId);"] } }]
+    },
+    {
+      "name": "Read pending order",
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/orders/{{shopKartOrderId}}" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Order detail loads', () => pm.response.to.have.status(200));", "const order = pm.response.json().order;", "pm.test('Order has snapshot and pending status', () => { pm.expect(order.paymentStatus).to.eql('PENDING'); pm.expect(order.status).to.eql('PENDING_PAYMENT'); pm.expect(order.items[0].name).to.be.a('string'); pm.expect(order.items[0].price).to.be.a('number'); pm.expect(order.shippingAddress.pincode).to.eql('560001'); });"] } }]
+    },
+    {
+      "name": "Reject forged payment signature",
+      "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"shopKartOrderId\":\"{{shopKartOrderId}}\",\"razorpay_order_id\":\"{{razorpayOrderId}}\",\"razorpay_payment_id\":\"pay_forged\",\"razorpay_signature\":\"0000000000000000000000000000000000000000000000000000000000000000\"}" }, "url": "{{baseUrl}}/orders/verify-payment" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Forged signature gets 400', () => pm.response.to.have.status(400));"] } }]
+    },
+    {
+      "name": "Cart remains after rejected payment",
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/cart" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Cart still has products', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().cart).to.not.be.empty; });"] } }]
+    },
+    {
+      "name": "List orders",
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/orders" },
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Order list loads newest first', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().orders[0]._id).to.eql(pm.collectionVariables.get('shopKartOrderId')); });"] } }]
+    }
+  ],
+  "protocolProfileBehavior": { "disableCookies": true }
+}

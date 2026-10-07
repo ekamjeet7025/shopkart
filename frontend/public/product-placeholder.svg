@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-label="Product image unavailable">
+  <rect width="600" height="600" fill="#e9ede6"/>
+  <circle cx="300" cy="288" r="165" fill="#d9e1d4"/>
+  <path d="M214 370V267c0-47 38-85 86-85s86 38 86 85v103" fill="none" stroke="#829987" stroke-width="15" stroke-linecap="round"/>
+  <rect x="185" y="269" width="230" height="168" rx="22" fill="#829987"/>
+  <path d="M214 370V267c0-47 38-85 86-85s86 38 86 85v103" fill="none" stroke="#526e5b" stroke-width="15" stroke-linecap="round"/>
+  <text x="300" y="500" text-anchor="middle" font-family="Arial,sans-serif" font-size="25" font-weight="700" letter-spacing="4" fill="#526e5b">SHOPKART</text>
+</svg>
