@@ -18,7 +18,6 @@ ShopKart is a MERN shopping app built across three labs: an authenticated wishli
 | `frontend/` | React, Vite, Axios, and React Router UI |
 | `backend/` | Express API, Mongoose models, JWT authentication, and Razorpay server integration |
 | `postman/` | API collections for Labs 04, 05, and 06 |
-| `LAB-06.md` | Checkout workflow, API details, and viva summary |
 
 ## Requirements
 
@@ -74,7 +73,7 @@ Run npm commands from `backend/` or `frontend/`, not from the repository root.
 | Cart | `GET /cart`, `POST /cart/:productId`, `PATCH /cart/:productId`, `DELETE /cart/:productId` |
 | Orders | `POST /orders/create-payment-order`, `POST /orders/verify-payment`, `GET /orders`, `GET /orders/:id` |
 
-Wishlist, cart, and order routes require authentication. See [Lab 06 details](LAB-06.md) for the payment sequence and request bodies.
+Wishlist, cart, and order routes require authentication. The backend calculates the order from the cart, creates a Razorpay Test Mode order, and verifies its signature before marking the order paid and clearing the cart.
 
 ## Checks
 
