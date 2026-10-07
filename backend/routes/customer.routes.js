@@ -25,7 +25,7 @@ router.get("/me", authMiddleware, getCurrentCustomer);
 
 
 // Logout
-router.post("/logout", logoutCustomer);
+router.post("/logout", authMiddleware, logoutCustomer);
 
 
 module.exports = router;

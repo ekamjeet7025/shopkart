@@ -29,18 +29,18 @@ const createProduct = async (req, res) => {
         }
 
         // Validate price
-        if (price <= 0) {
+        if (typeof price !== "number" || !Number.isFinite(price) || price <= 0) {
             return res.status(400).json({
                 success: false,
-                message: "Price must be greater than 0"
+                message: "Price must be a number greater than 0"
             });
         }
 
         // Validate stock
-        if (stock < 0) {
+        if (typeof stock !== "number" || !Number.isFinite(stock) || stock < 0) {
             return res.status(400).json({
                 success: false,
-                message: "Stock cannot be negative"
+                message: "Stock must be a non-negative number"
             });
         }
 
