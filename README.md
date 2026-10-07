@@ -74,6 +74,7 @@ You need Node.js, npm, a local MongoDB server or MongoDB Atlas database, and Raz
    MONGO_URI=mongodb://127.0.0.1:27017/shopkart
    PORT=3000
    JWT_SECRET=choose-a-long-random-value
+   ADMIN_API_KEY=choose-a-different-long-random-value
    RAZORPAY_KEY_ID=rzp_test_your_key_id
    RAZORPAY_KEY_SECRET=your_test_secret
    ```
@@ -98,7 +99,7 @@ You need Node.js, npm, a local MongoDB server or MongoDB Atlas database, and Raz
    npm run dev
    ```
 
-   Open the Vite URL, normally `http://localhost:5173`. The frontend calls `http://localhost:3000` by default. Set `VITE_API_URL` before starting Vite if the API is elsewhere; the backend CORS setting currently allows `http://localhost:5173`.
+   Open the Vite URL, normally `http://localhost:5173`. The frontend calls `http://localhost:3000` by default. Set `VITE_API_URL` before starting Vite if the API is elsewhere. The backend allows the local Vite origin during development.
 
 4. Register or sign in, add an in-stock product, then follow **Cart → Proceed to Checkout → Pay with Razorpay**. Use a Test Mode payment method; no real money is charged. After success, check the confirmation page, empty cart, and **My Orders**.
 
@@ -111,6 +112,7 @@ npm test
 npm run test:lab4
 npm run test:lab5
 npm run test:lab6
+npm run test:deployment
 ```
 
 Run these commands from `frontend/`:
@@ -120,8 +122,33 @@ npm run lint
 npm run build
 ```
 
-The integration tests use an isolated in-memory MongoDB. Lab 04 and Lab 05 also run their Postman collections with Newman. The Lab 06 integration test checks server-calculated totals, stock, ownership, valid and invalid signatures, cart clearing, and saved order snapshots. The Lab 06 Postman collection is in `postman/Lab-06-Checkout-Orders.postman_collection.json`; set its `email` and `password` variables to a disposable customer account. Complete one Test Mode payment in the browser to demonstrate the real Razorpay Checkout screen.
+The integration tests use an isolated in-memory MongoDB. Lab 04 and Lab 05 also run their Postman collections with Newman. The Lab 06 integration test checks server-calculated totals, stock, ownership, valid and invalid signatures, cart clearing, and saved order snapshots. `test:deployment` builds the frontend and checks that the production server serves React pages and protects product creation. The Lab 06 Postman collection is in `postman/Lab-06-Checkout-Orders.postman_collection.json`; set its `email` and `password` variables to a disposable customer account. Complete one Test Mode payment in the browser to demonstrate the real Razorpay Checkout screen.
 
-## Submission notes
+## Deploy on Render with MongoDB Atlas
 
-Deployment is optional for these labs. This repository contains the frontend, backend, setup instructions, and API tests. Keep MongoDB credentials, JWT secrets, Razorpay secrets, and `.env` files out of GitHub.
+The production server serves both the Express API and built React app from **one HTTPS domain**. This keeps the HTTP-only login cookie on the same site as the frontend. No Vercel project or cross-site cookie configuration is needed.
+
+1. In [MongoDB Atlas](https://www.mongodb.com/atlas), create a cluster and a database user. Copy the driver connection string (including the database name) as `MONGO_URI`. Add your backend's outbound IPs to Atlas Network Access. If your Render plan does not provide stable outbound IPs, Atlas also offers `0.0.0.0/0` access for a demo; use a strong, unique database password and restrict access when a stable IP or private networking is available. A new Atlas database starts empty, so add products before demonstrating checkout.
+2. In [Render](https://dashboard.render.com/), choose **New → Web Service**, connect `ekamjeet7025/shopkart`, and use branch `main`. Leave **Root Directory** blank because the build uses both folders. Choose Node, set **Build Command** to `npm ci --omit=dev --prefix backend && npm ci --include=dev --prefix frontend && npm run build --prefix frontend`, and **Start Command** to `npm start --prefix backend`. The frontend needs its development dependencies during the build; the backend does not need test packages at runtime.
+3. Set these **environment variables in Render**, not in GitHub or the frontend:
+
+   | Name | Value |
+   | --- | --- |
+   | `NODE_ENV` | `production` |
+   | `MONGO_URI` | Your Atlas connection string |
+   | `JWT_SECRET` | A new random string of at least 32 characters |
+   | `ADMIN_API_KEY` | A different random string of at least 32 characters |
+   | `RAZORPAY_KEY_ID` | Your Razorpay **Test Mode** key ID, beginning `rzp_test_` |
+   | `RAZORPAY_KEY_SECRET` | The matching Razorpay Test Mode secret |
+
+   Render provides `PORT`; do not set it yourself. Use a supported Node version for Vite 8 (Node 22.12+ or 20.19+). Set Render's health check path to `/health` if offered.
+4. Deploy and open `https://<your-service>.onrender.com/health`; it should return `{"status":"ok"}`. The site itself is at the same domain. Wait for `MongoDB connected` in Render logs if the first deploy takes time.
+5. If Atlas is new, add products through `POST https://<your-service>.onrender.com/products` from Postman with `Content-Type: application/json` and an `x-admin-key` header containing your `ADMIN_API_KEY`. The production endpoint refuses requests without that key. Never put the key into React code, `VITE_` variables, or a public Postman collection. You can also migrate your existing products to Atlas. Product images should use public HTTPS URLs or a path to a file in `frontend/public/`.
+
+   ```json
+   { "name": "Mechanical Keyboard", "description": "Compact keyboard", "price": 2999, "category": "Electronics", "image": "/product-placeholder.svg", "stock": 5 }
+   ```
+
+6. Test register/login, catalog, wishlist, cart, Razorpay Test Mode payment, order history, logout, and a direct refresh of `/checkout` or `/orders`. A successful login should set a `Secure`, `HttpOnly`, `SameSite=Lax` cookie. Keep the project in Test Mode; the backend rejects live Razorpay key IDs.
+
+Production does not require `VITE_API_URL`: the frontend calls the API on the same Render domain. During local development it still calls `http://localhost:3000`. Do not publish MongoDB credentials, JWT secrets, Razorpay secrets, the admin key, or `.env` files.

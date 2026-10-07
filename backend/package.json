@@ -9,6 +9,7 @@
     "test:lab4": "node tests/wishlist.integration.js --memory --postman",
     "test:lab5": "node tests/cart.integration.js --memory --postman",
     "test:lab6": "node tests/order.integration.js",
+    "test:deployment": "npm run build --prefix ../frontend && node tests/deployment.integration.js",
     "test": "node --test tests/*.test.js"
   },
   "keywords": [],
