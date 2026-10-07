@@ -1,5 +1,4 @@
 const express = require("express");
-const requireAdminKey = require("../middlewares/admin.middleware");
 
 const {
     createProduct,
@@ -11,7 +10,7 @@ const router = express.Router();
 
 
 // Create Product
-router.post("/", requireAdminKey, createProduct);
+router.post("/", createProduct);
 
 
 // Get All Products
